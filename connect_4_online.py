@@ -1,0 +1,235 @@
+# Kyle Johnston
+# Connect 4 torament WOOOOOOOOOOOOOOOOOOOoo
+import asyncio
+import websockets
+import random
+import numpy as np
+
+board = None
+
+
+def create_board():
+    return np.full((6, 7), ' ', dtype=str)
+
+def is_valid_move(board, col):
+    return board[0][col] == ' '
+
+def drop_piece(board, col, player):
+    for row in range(5, -1, -1):
+        if board[row][col] == ' ':
+            board[row][col] = player
+            break
+
+def winning_move(board, player):
+    
+    # Check horizontal
+    for row in range(6):
+        for col in range(4):
+            if board[row][col] == player and board[row][col + 1] == player and \
+               board[row][col + 2] == player and board[row][col + 3] == player:
+                return True
+
+    # Check vertical
+    for row in range(3):
+        for col in range(7):
+            if board[row][col] == player and board[row + 1][col] == player and \
+               board[row + 2][col] == player and board[row + 3][col] == player:
+                return True
+
+    # Check positively sloped diagonal
+    for row in range(3, 6):
+        for col in range(0, 5):
+            if board[row][col] == player and board[row - 1][col + 1] == player and \
+            board[row - 2][col + 2] == player and board[row - 3][col + 3] == player:
+                return True
+
+    # Check negatively sloped diagonal
+    for row in range(3):
+        for col in range(0, 5):
+            if board[row][col] == player and board[row + 1][col - 1] == player and \
+            board[row + 2][col - 2] == player and board[row + 3][col - 3] == player:
+                return True
+
+    return False
+
+def is_board_full(board):
+    return not any(' ' in row for row in board)
+
+def get_computer_move(board):
+    for col in range(7):
+        if is_valid_move(board, col):
+            # Check if the move creates a winning move for the computer
+            copy_board = np.copy(board)
+            drop_piece(copy_board, col, 'O')
+            if winning_move(copy_board, 'O'):
+                return col
+
+    for col in range(7):
+        if is_valid_move(board, col):
+            # Check if the move prevents the human player from winning
+            copy_board = np.copy(board)
+            drop_piece(copy_board, col, 'X')
+            if winning_move(copy_board, 'X'):
+                return col
+    
+    avoid_list = simulate_moves_and_avoid_player_wins(board, 'O')
+    valid_moves = [col for col in range(7) if is_valid_move(board, col) and col not in avoid_list]
+    
+    #Check for a future two way win
+    for col in range(7):
+        if is_valid_move(board, col) and col not in avoid_list:
+            copy_board = np.copy(board)
+            drop_piece(copy_board, col, 'O')
+
+            for next_col in range(7):
+                if is_valid_move(copy_board, next_col):
+                    next_copy_board = np.copy(copy_board)
+                    drop_piece(next_copy_board, next_col, 'X')
+                    
+                    if check_two_way_win(next_copy_board, 'X'):
+                        return next_col
+                    
+    col_2_future = check_2_future(board, 'O')
+    if col_2_future is not None and col_2_future not in avoid_list:
+        return col_2_future
+
+    # Check if the move can be strategically placed within 4 tiles from a previous piece
+    for col in range(7):
+        if is_valid_move(board, col) and col not in avoid_list:
+            for row in range(6):
+                if board[row][col] == 'O' or board[row][col] == 'X':
+                    for i in range(max(0, row - 4), min(6, row + 5)):
+                        if i != row and is_valid_move(board, col):
+                            return col
+    
+    if valid_moves:
+        return random.choice(valid_moves)
+
+    # If no winning, blocking, or strategic moves, choose a random valid move
+    valid_moves = [col for col in range(7) if is_valid_move(board, col)]
+    return np.random.choice(valid_moves)
+
+
+def simulate_moves_and_avoid_player_wins(board, player):
+    avoid_list = []
+    for col in range(7):
+        if is_valid_move(board, col):
+            # Simulate placing computer's chip first
+            computer_board = np.copy(board)
+            drop_piece(computer_board, col, player)
+
+            # Simulate placing player's chip
+            for player_col in range(7):
+                if is_valid_move(computer_board, player_col):
+                    player_board = np.copy(computer_board)
+                    drop_piece(player_board, player_col, 'X')
+
+                    # Check if player can win in the next turn
+                    if winning_move(player_board, 'X'):
+                        avoid_list.append(col)
+                        break
+
+    return avoid_list
+
+def check_two_way_win(board, player):
+    winning_moves_count = 0
+
+    for col in range(7):
+        if is_valid_move(board, col):
+            copy_board = np.copy(board)
+            drop_piece(copy_board, col, player)
+
+            # Check if the move creates winning moves for the player
+            if winning_move(copy_board, player):
+                winning_moves_count += 1
+
+            if winning_moves_count >= 2:
+                return True
+
+    return False
+
+
+def check_2_future(board, player):
+    for col in range(7):
+        if is_valid_move(board, col):
+            # Check if the move prevents the human player from winning in the next two moves
+            copy_board = np.copy(board)
+            drop_piece(copy_board, col, player)
+
+            for next_col in range(7):
+                if is_valid_move(copy_board, next_col):
+                    next_copy_board = np.copy(copy_board)
+                    drop_piece(next_copy_board, next_col, 'X')
+
+                    for third_col in range(7):
+                        if is_valid_move(next_copy_board, third_col):
+                            third_copy_board = np.copy(next_copy_board)
+                            drop_piece(third_copy_board, third_col, player)
+
+                            if winning_move(third_copy_board, player):
+                                return col
+
+    return None
+
+def calculate_move(opponentCol, board):
+  if opponentCol != -1:
+    drop_piece(board, opponentCol, 'X')
+  col = get_computer_move(board)
+  drop_piece(board, col, 'O')
+  return col
+  
+
+async def gameloop(socket, created):
+    global board  # Declare board as a global variable
+
+    active = True
+
+    while active:
+        try:
+            message = (await socket.recv()).split(':')
+            print("Received message:", message)  # Debugging line
+
+            match message[0]:
+                case 'GAMESTART' | 'OPPONENT':
+                    if board is None:
+                        board = create_board()
+                    if len(message) == 1: 
+                        opponentCol = -1
+                    else:
+                        opponentCol = int(message[1])  # Convert opponentCol to int
+                    col = calculate_move(opponentCol, board)
+                    
+                    await asyncio.sleep(1)
+                    await socket.send(f'PLAY:{col}')
+                case 'WIN' | 'LOSS' | 'DRAW' | 'TERMINATED':
+                    print(message[0])
+                    active = False
+        except websockets.exceptions.ConnectionClosedOK as e:
+            print("Connection closed:", e)
+            active = False
+        except Exception as e:
+            print("Unexpected error:", e)
+            active = False
+
+async def create_game (server):
+  async with websockets.connect(f'ws://{server}/create') as socket:
+    await gameloop(socket, True)
+
+async def join_game(server, id):
+  async with websockets.connect(f'ws://{server}/join/{id}') as socket:
+    await gameloop(socket, False)
+
+if __name__ == '__main__':
+  server = input('Server IP: ').strip()
+
+  protocol = input('Join game or create game? (j/c): ').strip()
+
+  match protocol:
+    case 'c':
+      asyncio.run(create_game(server))
+    case 'j':
+      id = input('Game ID: ').strip()
+
+      asyncio.run(join_game(server, id))
+    case _:
+      print('Invalid protocol!')
