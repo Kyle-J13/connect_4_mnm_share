@@ -24,33 +24,28 @@ def drop_piece(board, col, player):
             break
 
 def winning_move(board, player):
-    
-    # Check horizontal
+    # Check horizontally
     for row in range(6):
         for col in range(4):
-            if board[row][col] == player and board[row][col + 1] == player and \
-               board[row][col + 2] == player and board[row][col + 3] == player:
+            if all(board[row][col + i] == player for i in range(4)):
                 return True
 
-    # Check vertical
+    # Check vertically
     for row in range(3):
         for col in range(7):
-            if board[row][col] == player and board[row + 1][col] == player and \
-               board[row + 2][col] == player and board[row + 3][col] == player:
+            if all(board[row + i][col] == player for i in range(4)):
                 return True
 
     # Check positively sloped diagonal
     for row in range(3, 6):
-        for col in range(0, 5):
-            if board[row][col] == player and board[row - 1][col + 1] == player and \
-            board[row - 2][col + 2] == player and board[row - 3][col + 3] == player:
+        for col in range(4):
+            if all(board[row - i][col + i] == player for i in range(4)):
                 return True
 
     # Check negatively sloped diagonal
     for row in range(3):
-        for col in range(0, 5):
-            if board[row][col] == player and board[row + 1][col - 1] == player and \
-            board[row + 2][col - 2] == player and board[row + 3][col - 3] == player:
+        for col in range(4):
+            if all(board[row + i][col + i] == player for i in range(4)):
                 return True
 
     return False

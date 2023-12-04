@@ -21,33 +21,28 @@ def drop_piece(board, col, player):
             break
 
 def winning_move(board, player):
-    
-    # Check horizontal
+    # Check horizontally
     for row in range(6):
         for col in range(4):
-            if board[row][col] == player and board[row][col + 1] == player and \
-               board[row][col + 2] == player and board[row][col + 3] == player:
+            if all(board[row][col + i] == player for i in range(4)):
                 return True
 
-    # Check vertical
+    # Check vertically
     for row in range(3):
         for col in range(7):
-            if board[row][col] == player and board[row + 1][col] == player and \
-               board[row + 2][col] == player and board[row + 3][col] == player:
+            if all(board[row + i][col] == player for i in range(4)):
                 return True
 
     # Check positively sloped diagonal
     for row in range(3, 6):
-        for col in range(0, 5):
-            if board[row][col] == player and board[row - 1][col + 1] == player and \
-            board[row - 2][col + 2] == player and board[row - 3][col + 3] == player:
+        for col in range(4):
+            if all(board[row - i][col + i] == player for i in range(4)):
                 return True
 
     # Check negatively sloped diagonal
     for row in range(3):
-        for col in range(0, 5):
-            if board[row][col] == player and board[row + 1][col - 1] == player and \
-            board[row + 2][col - 2] == player and board[row + 3][col - 3] == player:
+        for col in range(4):
+            if all(board[row + i][col + i] == player for i in range(4)):
                 return True
 
     return False
@@ -190,6 +185,8 @@ async def gameloop(socket, created):
             print("Received message:", message)  # Debugging line
 
             match message[0]:
+                case 'ERROR':
+                    board = create_board()
                 case 'GAMESTART' | 'OPPONENT':
                     if board is None:
                         board = create_board()
@@ -198,6 +195,7 @@ async def gameloop(socket, created):
                     else:
                         opponentCol = int(message[1])  # Convert opponentCol to int
                     col = calculate_move(opponentCol, board)
+                    print_board(board)
                     
                     await asyncio.sleep(1)
                     await socket.send(f'PLAY:{col}')
@@ -210,6 +208,16 @@ async def gameloop(socket, created):
         except Exception as e:
             print("Unexpected error:", e)
             active = False
+
+
+def print_board(board):
+    print("  0   1   2   3   4   5   6 ")
+    print("|---|---|---|---|---|---|---|")
+    for row in board:
+        print(f'| {" | ".join(row)} |')
+        print("|---|---|---|---|---|---|---|")
+    print()
+
 
 async def create_game (server):
   async with websockets.connect(f'ws://{server}/create') as socket:
