@@ -1,5 +1,7 @@
 # Kyle Johnston
 # Connect 4 torament WOOOOOOOOOOOOOOOOOOOoo
+#Play online vs algorithm choices
+
 import asyncio
 import websockets
 import random
